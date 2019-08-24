@@ -13,4 +13,10 @@ interface FavoriteCityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun addCity(favoriteCity: FavoriteCity)
 
+    @Delete
+    fun delete(favoriteCity: FavoriteCity)
+
+    @Query("SELECT * FROM TB_CITY WHERE id = :id")
+    fun favoriteById(id: Int): FavoriteCity
+
 }

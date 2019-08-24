@@ -21,7 +21,6 @@ abstract class RoomManager : RoomDatabase() {
                         context,
                         RoomManager::class.java,
                         "weather.db")
-//                        .allowMainThreadQueries()
                         .build()
                 }
             }

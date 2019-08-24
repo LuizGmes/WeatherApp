@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.os.AsyncTask
 import android.os.Bundle
+import android.text.TextUtils
 import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
@@ -21,32 +22,27 @@ import br.com.weatherapp.entity.FavoriteCity
 import br.com.weatherapp.entity.FindResult
 import br.com.weatherapp.feature.setting.SettingActivity
 import kotlinx.android.synthetic.main.activity_list.*
+import kotlinx.android.synthetic.main.row_city_layout.*
+import kotlinx.android.synthetic.main.row_city_layout.view.*
+import org.jetbrains.anko.doAsync
+import org.jetbrains.anko.uiThread
 import retrofit2.Call
 import retrofit2.Callback
 import retrofit2.Response
 
 class ListActivity : AppCompatActivity() {
 
-    private val roomManager by lazy { RoomManager.instance(this) }
-
     private val adapter = ListAdapter()
+    private val roomManager by lazy {
+        RoomManager.instance(this)
+    }
+    private val sp by lazy {
+        getSharedPreferences(Const.SHARED_PREFERENCE, Context.MODE_PRIVATE)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_list)
-
-//        roomManager.getFavoriteDao()
-//            .addCity(FavoriteCity(10, "Recife"))
-//
-//        roomManager.getFavoriteDao()
-//            .addCity(FavoriteCity(11, "Olinda"))
-//
-//        val items = roomManager.getFavoriteDao()
-//            .getFavoriteCities()
-//
-//        items.forEach {
-//            Log.d("WELL", it.name)
-//        }
 
         getFavoriteCitiesAsync()
         initUI()
@@ -69,7 +65,7 @@ class ListActivity : AppCompatActivity() {
             override fun onPostExecute(result: List<FavoriteCity>?) {
                 super.onPostExecute(result)
                 result?.forEach {
-                    Log.d("WELL", it.name)
+                    Log.d("lula", it.name)
                 }
                 progressBar.visibility = View.GONE
             }
@@ -83,35 +79,107 @@ class ListActivity : AppCompatActivity() {
             adapter = this@ListActivity.adapter
         }
 
+        loadFavorites()
+
         btnSearch.setOnClickListener {
             findCity()
         }
     }
 
-    fun findCity() {
+    fun findCity() = if (isDeviceConnected()) {
+        progressBar.visibility = View.VISIBLE
+
+
+        val isCelsius = sp.getBoolean(Const.PREF_IS_CELSIUS, true)
+
+        var unit = "imperial"
+        when {
+            isCelsius -> unit = "metric"
+        }
+
+        val isPt = sp.getBoolean(Const.PREF_IS_PT, true)
+
+        var lang = "en"
+        when {
+            isPt -> lang = "pt"
+        }
+
+        val call = RetrofitManager
+            .getWeatherService()
+            .find(edtCityName.text.toString(),unit, Const.APP_KEY,lang)
+
+        call.enqueue(object : Callback<FindResult> {
+
+            override fun onFailure(call: Call<FindResult>, t: Throwable) {
+                Log.e("lula", "Error", t)
+                progressBar.visibility = View.GONE
+            }
+
+            override fun onResponse(call: Call<FindResult>, response: Response<FindResult>) {
+                if (response.isSuccessful) {
+                    response.body()?.let {
+                        adapter.data(it.items)
+                    }
+                }
+                progressBar.visibility = View.GONE
+            }
+        })
+    } else {
+        Toast.makeText(this,
+            "Device is not connected. Try again later",
+            Toast.LENGTH_LONG).show()
+    }
+
+    fun loadFavorites() {
         if (isDeviceConnected()) {
             progressBar.visibility = View.VISIBLE
 
-            val call = RetrofitManager
-                .getWeatherService()
-                .find(edtCityName.text.toString(), Const.APP_KEY)
 
-            call.enqueue(object : Callback<FindResult> {
-
-                override fun onFailure(call: Call<FindResult>, t: Throwable) {
-                    Log.e("WELL", "Error", t)
-                    progressBar.visibility = View.GONE
-                }
-
-                override fun onResponse(call: Call<FindResult>, response: Response<FindResult>) {
-                    if (response.isSuccessful) {
-                        response.body()?.let {
-                            adapter.data(it.items)
-                        }
+            doAsync {
+                val list: List<FavoriteCity>? = roomManager.getFavoriteDao().getFavoriteCities()
+                uiThread {
+                    val cityIdList: ArrayList<String> = ArrayList<String>()
+                    list?.forEach {
+                        cityIdList.add(it.id.toString())
                     }
-                    progressBar.visibility = View.GONE
+
+                    val isCelsius = sp.getBoolean(Const.PREF_IS_CELSIUS, true)
+
+                    var unit = "imperial"
+                    when {
+                        isCelsius -> unit = "metric"
+                    }
+
+                    val isPt = sp.getBoolean(Const.PREF_IS_PT, true)
+
+                    var lang = "en"
+                    when {
+                        isPt -> lang = "pt"
+                    }
+
+                    val filter: String = TextUtils.join(",", cityIdList)
+                    val call = RetrofitManager
+                        .getWeatherService()
+                        .group(filter, unit, Const.APP_KEY, lang)
+
+                    call.enqueue(object : Callback<FindResult> {
+
+                        override fun onFailure(call: Call<FindResult>, t: Throwable) {
+                            Log.e("lula", "Error", t)
+                            progressBar.visibility = View.GONE
+                        }
+
+                        override fun onResponse(call: Call<FindResult>, response: Response<FindResult>) {
+                            if (response.isSuccessful) {
+                                response.body()?.let {
+                                    adapter.data(it.items)
+                                }
+                            }
+                            progressBar.visibility = View.GONE
+                        }
+                    })
                 }
-            })
+            }
         } else {
             Toast.makeText(this,
                 "Device is not connected. Try again later",

@@ -26,9 +26,14 @@ class SettingActivity : AppCompatActivity() {
         rbC.isChecked = isCelsius
         rbF.isChecked = !isCelsius
 
+        val isPt = sp.getBoolean(Const.PREF_IS_PT, true)
+        rbPt.isChecked = isPt
+        rbEn.isChecked = !isPt
+
         btnSave.setOnClickListener {
             sp.edit().apply {
                 putBoolean(Const.PREF_IS_CELSIUS, rbC.isChecked)
+                putBoolean(Const.PREF_IS_PT, rbPt.isChecked)
                 apply()
             }
         }

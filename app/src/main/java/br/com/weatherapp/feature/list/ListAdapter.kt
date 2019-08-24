@@ -1,14 +1,17 @@
 package br.com.weatherapp.feature.list
 
-import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import br.com.weatherapp.R
+import br.com.weatherapp.database.RoomManager
 import br.com.weatherapp.entity.City
+import br.com.weatherapp.entity.FavoriteCity
 import com.bumptech.glide.Glide
 import kotlinx.android.synthetic.main.row_city_layout.view.*
+import org.jetbrains.anko.doAsync
+import org.jetbrains.anko.uiThread
 
 class ListAdapter() : RecyclerView.Adapter<ListAdapter.ViewHolder>() {
 
@@ -23,6 +26,8 @@ class ListAdapter() : RecyclerView.Adapter<ListAdapter.ViewHolder>() {
     override fun getItemCount() = items?.size ?: 0
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+        val roomManager = RoomManager.instance(holder.itemView.context)
+
         items?.let {
             val city = it[position]
 
@@ -40,6 +45,37 @@ class ListAdapter() : RecyclerView.Adapter<ListAdapter.ViewHolder>() {
 
                 tvTemperature.text = city.main.temp.toInt().toString()
                 tvCityName.text = city.name
+
+                doAsync {
+                    val favoriteCity: FavoriteCity = roomManager.getFavoriteDao().favoriteById(city.id)
+
+                    uiThread {
+                        if(favoriteCity != null) {
+                            imgFavorite.setImageResource(R.drawable.ic_star_yellow_24dp)
+                        } else {
+                            imgFavorite.setImageResource(R.drawable.ic_star_border_gray_24dp)
+                        }
+                    }
+                }
+
+                imgFavorite.setOnClickListener {
+                    doAsync {
+                        val cityResult: FavoriteCity = roomManager.getFavoriteDao().favoriteById(city.id)
+                        if (cityResult == null) {
+                            roomManager.getFavoriteDao().addCity(FavoriteCity(city.id, city.name))
+
+                            uiThread {
+                                imgFavorite.setImageResource(R.drawable.ic_star_yellow_24dp)
+                            }
+                        } else {
+                            roomManager.getFavoriteDao().delete(cityResult)
+                            uiThread {
+                                imgFavorite.setImageResource(R.drawable.ic_star_border_gray_24dp)
+                            }
+                        }
+                    }
+                }
+
             }
         }
     }
