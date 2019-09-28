@@ -39,3 +39,9 @@ jobs:
       - store_artifacts:
           path: app/build/outputs/apk
           destination: apk
+      - run:
+          name: Bundle
+          command: bundle install
+      - run:
+          name: Build application
+          command: fastlane deploy
